@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ReportSathi Telugu</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <p class="eyebrow">TELUGU VOICE-TO-COMPLAINT DRAFT</p>
+        <h1>ReportSathi</h1>
+        <p class="lead">Describe a suspected cyber-fraud incident in Telugu. Review the transcript, then create a clear complaint draft.</p>
+      </header>
+
+      <section class="urgent" aria-label="Urgent safety guidance">
+        <strong>Urgent:</strong> If money was transferred or credentials were shared, contact your bank and call <a href="tel:1930">1930</a> immediately. You can also use the official <a href="https://cybercrime.gov.in" target="_blank" rel="noopener">National Cyber Crime Reporting Portal</a>. This tool does not file a complaint or verify whether a call was fraudulent.
+      </section>
+
+      <section class="card">
+        <h2>1. Upload a short Telugu recording</h2>
+        <p class="hint">Use your own synthetic practice example only. Supported: WAV, MP3, OGG, FLAC, AAC, M4A. Keep it under 30 seconds. The audio is sent to Gnani for transcription and is not saved by this app.</p>
+        <form id="audio-form">
+          <label for="audio">Audio file</label>
+          <input id="audio" name="audio" type="file" accept="audio/wav,audio/mpeg,audio/ogg,audio/flac,audio/aac,audio/mp4,.wav,.mp3,.ogg,.flac,.aac,.m4a" required>
+          <label class="check"><input type="checkbox" required> I confirm this is my own or synthetic practice audio and contains no passwords, OTPs, bank-account numbers, or Aadhaar numbers.</label>
+          <button id="transcribe-button" type="submit">Transcribe with Gnani Prisma</button>
+        </form>
+        <p id="transcribe-status" class="status" aria-live="polite"></p>
+      </section>
+
+      <section class="card" id="draft-section">
+        <h2>2. Review and prepare the complaint draft</h2>
+        <p class="hint">Please correct the transcript. If transcription fails, type the incident description yourself and continue. ReportSathi does not automatically decide what happened.</p>
+        <label for="transcript">What happened? (editable transcript)</label>
+        <textarea id="transcript" rows="6" placeholder="Your Telugu transcript will appear here."></textarea>
+        <p id="draft-status" class="status" aria-live="polite"></p>
+
+        <div class="grid">
+          <div>
+            <label for="incident-type">Incident type</label>
+            <select id="incident-type">
+              <option value="Suspicious call or message">Suspicious call or message</option>
+              <option value="UPI or bank-transfer fraud">UPI or bank-transfer fraud</option>
+              <option value="Account or WhatsApp takeover">Account or WhatsApp takeover</option>
+              <option value="Other suspected cyber fraud">Other suspected cyber fraud</option>
+            </select>
+          </div>
+          <div>
+            <label for="incident-time">Approximate date and time</label>
+            <input id="incident-time" type="datetime-local">
+          </div>
+          <div>
+            <label for="money">Was money transferred?</label>
+            <select id="money">
+              <option value="I am not sure">I am not sure</option>
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+        </div>
+        <button id="create-draft" type="button">Create complaint draft</button>
+        <label for="complaint-draft">Complaint draft</label>
+        <textarea id="complaint-draft" rows="10" placeholder="Your structured complaint draft will appear here."></textarea>
+        <button id="copy-draft" class="secondary" type="button">Copy draft</button>
+      </section>
+
+      <footer>
+        <p>Privacy: Do not enter OTPs, PINs, passwords, bank-account numbers, Aadhaar numbers, or recordings of other people without consent.</p>
+      </footer>
+    </main>
+    <script>
+      const form = document.querySelector('#audio-form');
+      const status = document.querySelector('#transcribe-status');
+      const transcript = document.querySelector('#transcript');
+      const button = document.querySelector('#transcribe-button');
+      const draftStatus = document.querySelector('#draft-status');
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        button.disabled = true;
+        button.textContent = 'Transcribing…';
+        status.textContent = 'Uploading securely to Gnani Prisma…';
+        const response = await fetch('/transcribe', { method: 'POST', body: new FormData(form) });
+        const data = await response.json();
+        button.disabled = false;
+        button.textContent = 'Transcribe with Gnani Prisma';
+        if (!response.ok) {
+          status.textContent = data.error || 'Something went wrong. Please try again.';
+          status.className = 'status error';
+          return;
+        }
+        transcript.value = data.transcript;
+        status.textContent = `Done with ${data.model}. Detected language: ${data.detected_language}. Please review the text.`;
+        status.className = 'status success';
+      });
+
+      document.querySelector('#create-draft').addEventListener('click', () => {
+        const type = document.querySelector('#incident-type').value;
+        const time = document.querySelector('#incident-time').value || 'Not provided';
+        const money = document.querySelector('#money').value;
+        const narrative = transcript.value.trim();
+        if (!narrative) {
+          draftStatus.textContent = 'Add or correct an incident description before creating a draft.';
+          draftStatus.className = 'status error';
+          transcript.focus();
+          return;
+        }
+        draftStatus.textContent = '';
+        document.querySelector('#complaint-draft').value =
+          `UNVERIFIED USER-PREPARED NOTE — NOT SUBMITTED\n\nSubject: Suspected cyber-fraud incident\n\nIncident type: ${type}\nApproximate date and time: ${time}\nWas money transferred?: ${money}\n\nDescription provided by the reporter:\n${narrative}\n\nI request guidance on the next official reporting steps.`;
+      });
+
+      document.querySelector('#copy-draft').addEventListener('click', async () => {
+        const draft = document.querySelector('#complaint-draft');
+        if (!draft.value.trim()) return;
+        await navigator.clipboard.writeText(draft.value);
+        status.textContent = 'Complaint draft copied.';
+        status.className = 'status success';
+      });
+    </script>
+  </body>
+</html>
